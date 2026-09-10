@@ -12,7 +12,15 @@ def sample_hypeparams(trail):
     pass
 
 def target_env(trail):
-    pass
+    try:
+        env_id = "PandaPickAndPlace-v3"
+        num_vec = 4
+        train_time = 250_000
+        env_opt = make_vec_env(env_id=env_id, n_envs=num_vec)
+        env_norm = VecNormalize(env_opt)
+    except KeyboardInterrupt:
+        print("UserInterupted")
+        pass
 
 def main():
     pass
