@@ -9,7 +9,9 @@ from stable_baselines3 import HerReplayBuffer
 from sb3_contrib import TQC
 
 def sample_hypeparams(trail):
-    pass
+    params = {}
+    params["n_steps"] = trail.suggest_int("n_steps", 2048, 14336)
+    params["buffer_size"] = trail.suggest_int("buffer_size", 1e2, 1e6)
 
 def target_env(trail):
     try:
