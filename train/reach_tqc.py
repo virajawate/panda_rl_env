@@ -10,8 +10,24 @@ from sb3_contrib import TQC
 
 def sample_hypeparams(trail):
     params = {}
+    policy_params = {}
     params["n_steps"] = trail.suggest_int("n_steps", 2048, 14336)
     params["buffer_size"] = trail.suggest_int("buffer_size", 1e2, 1e6)
+    params["learning_rate"] = trail.suggest_loguniform("learning_rate", 1e-5, 1e-2)
+    params["batch_size"] = trail.suggest_categorical("batch_size", [512, 1024, 1280])
+    params["gamma"] = trail.suggest_uniform("gamma", 0.9, 0.99)
+    params["tau"] = trail.suggest_uniform("tau", 0.001, 0.05)
+    policy_params["net_arch"] = trail.suggest_categorical("net_arch", [
+        [256, 256, 256],
+        [400, 400, 400],
+        [512, 512, 512],
+        [1024,1024,1024]
+    ])
+    policy_params["n_critics"] = trail.suggest_int("n_critics", 3, 6)
+    policy_params["share_features_extractor"] = trail.suggest_categorical("share_features_extractor", [True, False])
+    params["policy_kwargs"] = policy_params
+    params["learning_rate"] = trail.suggest_loguniform("learning_starts", 1e2, 1e6)
+    return params
 
 def target_env(trail):
     try:
