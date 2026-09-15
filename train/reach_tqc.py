@@ -24,7 +24,7 @@ def sample_hypeparams(trail):
     params["buffer_size"] = trail.suggest_int("buffer_size", 1e2, 1e6)
     params["learning_rate"] = trail.suggest_float("learning_rate", 1e-5, 3e-4, log=True)
     params["batch_size"] = trail.suggest_categorical("batch_size", [512, 1024, 1280])
-    params["gamma"] = trail.suggest_uniform("gamma", 0.9, 0.99)
+    params["gamma"] = trail.suggest_uniform("gamma", 0.99, 0.999)
     params["tau"] = trail.suggest_uniform("tau", 0.001, 0.05)
     policy_params["net_arch"] = trail.suggest_categorical("net_arch", [
         [256, 256, 256],
