@@ -44,3 +44,9 @@ pip install -r requirements.txt
 python .\train\reach_tqc.py
 
 ```
+
+## Host Tensorboard for the training logs
+
+```sh
+tensorboard --logdir .\logs\tensor\
+```
