@@ -103,7 +103,7 @@ def target_env(trail):
 def main():
     param_tunning = optuna.create_study(direction = "maximize")
     param_tunning.optimize(target_env, n_trials=5, n_jobs=1, show_progress_bar=True, gc_after_trial=True)
-    print(f"Best HyperParams : \n{param_tunning.best_params} \nat this\n{param_tunning.best_trail} trail.")
+    print(f"Best HyperParams : \n{param_tunning.best_params} \nat this\n{param_tunning.best_trial} trial.")
 
 if __name__ == "__main__":
     try:
