@@ -1,0 +1,45 @@
+"""
+Trail Parameters 
+{
+    'n_steps': 8460, 
+    'buffer_size': 838152, 
+    'learning_rate': 2.6120830147538704e-05, 
+    'batch_size': 1024, 
+    'gamma': 0.9980044243662173, 
+    'tau': 0.007473090552785445, 
+    'policy_kwargs': {
+        'net_arch': [400, 400, 400], 
+        'n_critics': 4, 
+        'share_features_extractor': True
+    }, 
+    'learning_starts': 334.51497557842686
+}
+
+Trail Parameters {
+    'buffer_size': 250000, 
+    'learning_rate': 0.00012747986999417116, 
+    'batch_size': 512, 
+    'gamma': 0.9911114104667729, 
+    'tau': 0.004734447478152347, 
+    'policy_kwargs': {
+        'net_arch': [256, 256, 256], 
+        'n_critics': 4, 
+        'share_features_extractor': False
+    }, 
+    'learning_starts': 113.60986909672964
+}
+
+Trail Parameters {
+    'buffer_size': 100000, 
+    'learning_rate': 0.0001225692711070348, 
+    'batch_size': 512, 
+    'gamma': 0.996193590624846, 
+    'tau': 0.04723494941936019, 
+    'policy_kwargs': {
+        'net_arch': [256, 256], 
+        'n_critics': 2, 
+        'share_features_extractor': True
+    }, 
+    'learning_starts': 248.7903299422005
+}
+"""
