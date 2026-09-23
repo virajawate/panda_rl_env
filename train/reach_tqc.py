@@ -5,7 +5,7 @@ import optuna
 import torch
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import VecNormalize
+from stable_baselines3.common.vec_env import VecNormalize, SubprocVecEnv
 from stable_baselines3 import HerReplayBuffer
 from sb3_contrib import TQC
 
@@ -20,19 +20,19 @@ print(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
 def sample_hypeparams(trail):
     params = {}
     policy_params = {}
-    params["n_steps"] = trail.suggest_int("n_steps", 2048, 14336)
-    params["buffer_size"] = trail.suggest_int("buffer_size", 1e2, 1e6)
+    # params["n_steps"] = trail.suggest_int("n_steps", 2048, 14336)
+    params["buffer_size"] = trail.suggest_categorical("buffer_size", [50_000, 100_000, 250_000, 500_000])
     params["learning_rate"] = trail.suggest_float("learning_rate", 1e-5, 3e-4, log=True)
-    params["batch_size"] = trail.suggest_categorical("batch_size", [512, 1024, 1280])
+    params["batch_size"] = trail.suggest_categorical("batch_size", [128, 258, 512])
     params["gamma"] = trail.suggest_uniform("gamma", 0.99, 0.999)
     params["tau"] = trail.suggest_uniform("tau", 0.001, 0.05)
     policy_params["net_arch"] = trail.suggest_categorical("net_arch", [
+        [256, 256],        
         [256, 256, 256],
-        [400, 400, 400],
+        [512, 512],
         [512, 512, 512],
-        [1024,1024,1024]
     ])
-    policy_params["n_critics"] = trail.suggest_int("n_critics", 3, 6)
+    policy_params["n_critics"] = trail.suggest_int("n_critics", 2, 4)
     policy_params["share_features_extractor"] = trail.suggest_categorical("share_features_extractor", [True, False])
     params["policy_kwargs"] = policy_params
     params["learning_starts"] = trail.suggest_float("learning_starts", 1e2, 1e3, log=True)
@@ -43,7 +43,7 @@ def sample_hypeparams(trail):
 
 def target_env(trail):
     try:
-        env_id = "PandaPickAndPlace-v3"
+        env_id = "PandaReachDense-v3"
         num_vec = 5
         train_time = 250_000
         env_opt = make_vec_env(env_id=env_id, n_envs=num_vec)
@@ -63,10 +63,10 @@ def target_env(trail):
             train_model = TQC(
                 **model_params,
                 policy="MultiInputPolicy",
-                env=env_norm,
+                env=env_opt,
                 replay_buffer_class=HerReplayBuffer,
                 tensorboard_log=tensor_log_dir,
-                verbose=1,
+                verbose=0,
                 device="cuda:0"
             )
             try:
@@ -92,8 +92,8 @@ def target_env(trail):
         mean_reward, _ = evaluate_policy(
             train_model,
             env_norm,
-            n_eval_episodes=1000,
-            render=True
+            n_eval_episodes=20,
+            render=False
         )
         return mean_reward
     except KeyboardInterrupt:
@@ -102,7 +102,7 @@ def target_env(trail):
 
 def main():
     param_tunning = optuna.create_study(direction = "maximize")
-    param_tunning.optimize(target_env, n_trials=20, n_jobs=3, show_progress_bar=False, gc_after_trial=True)
+    param_tunning.optimize(target_env, n_trials=5, n_jobs=1, show_progress_bar=True, gc_after_trial=True)
     print(f"Best HyperParams : \n{param_tunning.best_params} \nat this\n{param_tunning.best_trail} trail.")
 
 if __name__ == "__main__":
