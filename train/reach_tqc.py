@@ -1,7 +1,10 @@
 import os 
+import json
+from datetime import datetime
 import gymnasium as gym
 import panda_gym
 import optuna
+import numpy as np
 import torch
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -45,7 +48,7 @@ def target_env(trail):
     try:
         env_id = "PandaReachDense-v3"
         num_vec = 5
-        train_time = 250_000
+        train_time = 150_000
         env_opt = make_vec_env(env_id=env_id, n_envs=num_vec)
         env_norm = VecNormalize(env_opt)
         max_episode_steps = getattr(env_opt.envs[0], "_max_episode_steps", None)
@@ -103,7 +106,24 @@ def target_env(trail):
 def main():
     param_tunning = optuna.create_study(direction = "maximize")
     param_tunning.optimize(target_env, n_trials=5, n_jobs=1, show_progress_bar=True, gc_after_trial=True)
-    print(f"Best HyperParams : \n{param_tunning.best_params} \nat this\n{param_tunning.best_trial} trial.")
+    best_trial = param_tunning.best_trial
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "best_trials")
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    output_path = os.path.join(output_dir, f"PandaReachDense-v3_{timestamp}.npz")
+    trials = param_tunning.trials
+    np.savez_compressed(
+        output_path,
+        trial_numbers=np.array([trial.number for trial in trials]),
+        trial_values=np.array([np.nan if trial.value is None else trial.value for trial in trials]),
+        trial_states=np.array([trial.state.name for trial in trials]),
+        trial_params=np.array([json.dumps(trial.params) for trial in trials]),
+        best_params=json.dumps(param_tunning.best_params),
+        best_trial_number=best_trial.number,
+        best_trial_value=best_trial.value,
+    )
+    print(f"Best HyperParams : \n{param_tunning.best_params} \nat this\n{best_trial} trial.")
+    print(f"Saved trial results to {output_path}")
 
 if __name__ == "__main__":
     try:
