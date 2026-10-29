@@ -38,15 +38,20 @@ pip install -r requirements.txt
 
 ```
 
-## Run the training Reinforcement Learning Environment
+## Run a hyperparameter search
 
 ```sh
-python .\train\reach_tqc.py
-
+python train/opt_reach_ppo.py
+python train/opt_reach_sac.py
+python train/opt_reach_td3.py
+python train/opt_reach_tqc.py
 ```
 
-## Host Tensorboard for the training logs
+Each script runs an Optuna search for `PandaReachDense-v3` and saves trial
+results as a compressed `.npz` file under `logs/best_trials/`.
+
+## Host TensorBoard for the training logs
 
 ```sh
-tensorboard --logdir .\logs\tensor\
+tensorboard --logdir logs/tensor
 ```
