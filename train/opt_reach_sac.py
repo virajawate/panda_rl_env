@@ -22,7 +22,7 @@ NETWORK_ARCHITECTURES = {
 }
 
 
-def sample_hyperparameters(trial):
+def sample_hyperparameters(trial, min_learning_starts):
     architecture = trial.suggest_categorical(
         "net_arch", list(NETWORK_ARCHITECTURES)
     )
@@ -35,7 +35,10 @@ def sample_hyperparameters(trial):
         "gamma": trial.suggest_float("gamma", 0.99, 0.999),
         "tau": trial.suggest_float("tau", 0.001, 0.05),
         "learning_starts": trial.suggest_int(
-            "learning_starts", 100, 1_000, log=True
+            "learning_starts",
+            min_learning_starts,
+            max(1_000, min_learning_starts * 4),
+            log=True,
         ),
         "train_freq": trial.suggest_categorical("train_freq", [1, 4]),
         "gradient_steps": trial.suggest_categorical("gradient_steps", [1, 4]),
@@ -51,13 +54,27 @@ def target_env(trial):
         norm_reward=False,
     )
     try:
+        first_env = env.venv.envs[0]
+        max_episode_steps = getattr(first_env, "_max_episode_steps", None)
+        if max_episode_steps is None:
+            max_episode_steps = getattr(
+                getattr(first_env, "spec", None), "max_episode_steps", None
+            )
+        if max_episode_steps is None or max_episode_steps <= 0:
+            raise RuntimeError(
+                f"Could not determine the episode limit for {ENV_ID}; "
+                "cannot safely configure HER learning_starts."
+            )
+        min_learning_starts = int(max_episode_steps) * NUM_ENVS + 1
+        model_params = sample_hyperparameters(trial, min_learning_starts)
+        trial.set_user_attr("model_params", model_params)
         model = SAC(
             "MultiInputPolicy",
             env,
-            **sample_hyperparameters(trial),
+            **model_params,
             replay_buffer_class=HerReplayBuffer,
             tensorboard_log=os.path.join("logs", "tensor", f"SAC_{ENV_ID}"),
-            verbose=0,
+            verbose=1,
             device="auto",
         )
         model.learn(total_timesteps=TOTAL_TIMESTEPS)
@@ -100,6 +117,23 @@ def save_results(study):
         f"(value={best_trial.value}, params={study.best_params})\n"
         f"Saved trial results to {output_path}"
     )
+    params_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "params",
+    )
+    os.makedirs(params_dir, exist_ok=True)
+    params_path = os.path.join(
+        params_dir, f"SAC_{ENV_ID}_{timestamp}.npz"
+    )
+    np.savez_compressed(
+        params_path,
+        algorithm="SAC",
+        env_id=ENV_ID,
+        best_params=json.dumps(best_trial.user_attrs["model_params"]),
+        best_trial_number=best_trial.number,
+        best_trial_value=best_trial.value,
+    )
+    print(f"Saved best parameters to {params_path}")
 
 
 def main():
