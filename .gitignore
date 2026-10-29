@@ -2,3 +2,4 @@
 logs/**
 requirements_global.txt
 *.pyc
+prl_env
