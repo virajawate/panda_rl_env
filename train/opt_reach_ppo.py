@@ -46,12 +46,14 @@ def target_env(trial):
         norm_reward=False,
     )
     try:
+        model_params = sample_hyperparameters(trial)
+        trial.set_user_attr("model_params", model_params)
         model = PPO(
             "MultiInputPolicy",
             env,
-            **sample_hyperparameters(trial),
+            **model_params,
             tensorboard_log=os.path.join("logs", "tensor", f"PPO_{ENV_ID}"),
-            verbose=0,
+            verbose=1,
             device="auto",
         )
         model.learn(total_timesteps=TOTAL_TIMESTEPS)
@@ -94,6 +96,23 @@ def save_results(study):
         f"(value={best_trial.value}, params={study.best_params})\n"
         f"Saved trial results to {output_path}"
     )
+    params_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "params",
+    )
+    os.makedirs(params_dir, exist_ok=True)
+    params_path = os.path.join(
+        params_dir, f"PPO_{ENV_ID}_{timestamp}.npz"
+    )
+    np.savez_compressed(
+        params_path,
+        algorithm="PPO",
+        env_id=ENV_ID,
+        best_params=json.dumps(best_trial.user_attrs["model_params"]),
+        best_trial_number=best_trial.number,
+        best_trial_value=best_trial.value,
+    )
+    print(f"Saved best parameters to {params_path}")
 
 
 def main():
