@@ -10,7 +10,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import VecNormalize
 from stable_baselines3 import HerReplayBuffer
 from sb3_contrib import TQC
-
+ENV_ID = "PandaReachDense-v3"
 if not torch.cuda.is_available():
     raise RuntimeError(
         "CUDA is unavailable to PyTorch. Install a CUDA-enabled PyTorch build "
@@ -19,7 +19,7 @@ if not torch.cuda.is_available():
 
 print(f"Using CUDA device: {torch.cuda.get_device_name(0)}")
 
-def sample_hypeparams(trail):
+def sample_hypeparams(trail, min_learning_starts):
     params = {}
     policy_params = {}
     # params["n_steps"] = trail.suggest_int("n_steps", 2048, 14336)
@@ -37,24 +37,34 @@ def sample_hypeparams(trail):
     policy_params["n_critics"] = trail.suggest_int("n_critics", 2, 4)
     policy_params["share_features_extractor"] = trail.suggest_categorical("share_features_extractor", [True, False])
     params["policy_kwargs"] = policy_params
-    params["learning_starts"] = trail.suggest_float("learning_starts", 1e2, 1e3, log=True)
+    params["learning_starts"] = trail.suggest_int(
+        "learning_starts",
+        min_learning_starts,
+        max(1_000, min_learning_starts * 4),
+        log=True,
+    )
     return params
 
 def target_env(trail):
-    env_id = "PandaReachDense-v3"
     num_vec = 5
     train_time = 150_000
-    env_opt = make_vec_env(env_id=env_id, n_envs=num_vec)
+    env_opt = make_vec_env(ENV_ID, n_envs=num_vec)
     env_norm = VecNormalize(env_opt)
     max_episode_steps = getattr(env_opt.envs[0], "_max_episode_steps", None)
     if max_episode_steps is None:
         max_episode_steps = getattr(
-            getattr(env_opt.envs[0], "spec", None), "max_episode_steps", 0
+            getattr(env_opt.envs[0], "spec", None), "max_episode_steps", None
         )
-    min_learning_starts = (max_episode_steps * num_vec) + 1
+    if max_episode_steps is None or max_episode_steps <= 0:
+        env_opt.close()
+        raise RuntimeError(
+            f"Could not determine the episode limit for {ENV_ID}; "
+            "cannot safely configure HER learning_starts."
+        )
+    min_learning_starts = int(max_episode_steps) * num_vec + 1
     dir = os.path.curdir
-    tensor_log_dir = os.path.join(dir, "logs", "tensor", f"TQC_{env_id}_{train_time}_{num_vec}")
-    model_params = sample_hypeparams(trail)
+    tensor_log_dir = os.path.join(dir, "logs", "tensor", f"TQC_{ENV_ID}_{train_time}_{num_vec}")
+    model_params = sample_hypeparams(trail, min_learning_starts)
     retry_count = 0
     while True:
         train_model = TQC(
@@ -63,9 +73,10 @@ def target_env(trail):
             env=env_opt,
             replay_buffer_class=HerReplayBuffer,
             tensorboard_log=tensor_log_dir,
-            verbose=0,
+            verbose=1,
             device="cuda:0"
         )
+        trail.set_user_attr("model_params", model_params)
         try:
             train_model.learn(total_timesteps=train_time)
             break
@@ -80,8 +91,10 @@ def target_env(trail):
             model_params["learning_starts"] = trail.suggest_int(
                 f"learning_starts_retry_{retry_count}",
                 max(100, min_learning_starts),
-                1_000
+                max(1_000, min_learning_starts * 4),
+                log=True,
             )
+            trail.set_user_attr("model_params", model_params)
         except ValueError as error:
             if "nan" in str(error).lower() or "invalid values" in str(error).lower():
                 raise optuna.TrialPruned("Training diverged with non-finite policy values") from error
@@ -119,6 +132,23 @@ def main():
         f"(value={best_trial.value}, params={param_tunning.best_params})\n"
         f"Saved trial results to {output_path}"
     )
+    params_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "params",
+    )
+    os.makedirs(params_dir, exist_ok=True)
+    params_path = os.path.join(
+        params_dir, f"TQC_{ENV_ID}_{timestamp}.npz"
+    )
+    np.savez_compressed(
+        params_path,
+        algorithm="TQC",
+        ENV_ID=ENV_ID,
+        best_params=json.dumps(best_trial.user_attrs["model_params"]),
+        best_trial_number=best_trial.number,
+        best_trial_value=best_trial.value,
+    )
+    print(f"Saved best parameters to {params_path}")
 
 if __name__ == "__main__":
     try:
